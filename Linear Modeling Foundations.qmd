@@ -1,0 +1,461 @@
+---
+title: "R Notes 8 -- Regression STARTER"
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    df-print: kable
+execute: 
+  warning: false
+  message: false
+---
+
+```{r}
+
+# load packages
+library(tidyverse)
+library(corrplot)
+library(olsrr)
+library(tidymodels)
+
+```
+
+## Overview
+
+The goal of these notes is to demonstrate how to fit linear regression models in R and perform other common tasks related to modelling.
+
+## Fitting SLR regression model
+
+To demonstrate how to fit a simple linear regression model in R, we will use the `msleep` dataset, specifically we will predict the total amount of sleep (`sleep_total`) from length of sleep cycle (`sleep_cycle`).
+
+```{r}
+
+# preview data
+glimpse(msleep)
+
+```
+
+Lets first see if a linear regression is appropriate by creating scatterplot of the two variables.
+
+```{r}
+
+# create scatterplot
+plot(x = msleep$sleep_total, y = msleep$sleep_cycle)
+
+```
+
+There does appear to be a linear relationship between the two variables, so we can continue.
+
+We learned the formulas for the point estimators of $\beta_0$ and $\beta_1$:
+
+$$
+\begin{align*}
+  \text{Intercept} \hspace{10pt} \hat{\beta}_0 \hspace{10pt} &= \hspace{10pt} \frac{1}{n}\sum Y_i + \hat{\beta}_1 \frac{1}{n} \sum X_i \hspace{10pt} = \hspace{10pt} \bar{Y}- \hat{\beta}_1 \bar{X} \\
+  \text{Slope} \hspace{10pt} \hat{\beta_1} \hspace{10pt} &= \hspace{10pt} \frac{\sum X_i Y_i -\frac{1}{n} \sum X_i Y_i}{\sum X_i^2 - \frac{1}{n}(\sum X_i)^2} \hspace{10pt} = \hspace{10pt} \frac{\sum(X_i - \bar{X})(Y_i - \bar{Y})}{\sum(X_i - \bar{X})^2} \hspace{10pt} = \hspace{10pt} \frac{S_{XY}}{S_{XX}}
+\end{align*}
+$$
+
+Using R functions, we can calculate these with the using `lm(formula = < y > ~ < x >, data = < data > )`, and then extract them with `coef(< mod >)`.
+
+```{r}
+
+# fit regression model
+mod_sleep=lm(sleep_total~sleep_cycle, data=msleep)
+
+# view estimated coefficients
+coef(mod_sleep)
+
+```
+
+<!-- Fitted model: $\widehat{\text{sleep total}}$ = `r abs(round(coef(mod_sleep)[1], 2))` - `r abs(round(coef(mod_sleep)[2], 2))` $\times \text{ sleep cycle}$ -->
+
+<!-- Interpretation of $\hat{\beta}_1$: As the sleep cycle increases by 1 hours, the total amount of sleep decreases by `r abs(round(coef(mod_sleep)[2], 2))` hours on average. -->
+
+Here is the resulting estimated regression line visualized:
+
+```{r}
+
+# add regression line to scatterplot
+plot(x=msleep$sleep_cycle, y=msleep$sleep_total)
+abline(mod_sleep, col="red")
+
+```
+
+## Testing a SLR model
+
+To see if the estimated slope is significantly different than zero (horizontal regression line), we can test the following hypotheses:
+
+$$
+\begin{align*}
+  H_0 &: \beta_1 = 0 \\
+  H_A &: \beta_1 \ne 0
+\end{align*}
+$$
+
+Then use the test statistic:
+
+$$
+TS = t^* = \frac{\hat{\beta}_1 - 0}{S_{\hat{\beta}_1}} = \frac{\hat{\beta}_1}{\sqrt{MSE / S_{XX}}}
+$$
+
+Next, make the conclusion based on:
+
+$$
+\begin{align*}
+  RR &= \{\lvert t^* \rvert > t_{\alpha/2, n - 2}\} \\
+  p\text{-value} &= 2 \cdot P(t_{n-2} \ge \lvert t^* \rvert)
+\end{align*}
+$$
+
+And finally write the correct interpretation.
+
+R gives us the result of this test in the output of `summary(< mod >)`.
+
+```{r}
+
+# view model summary
+summary(mod_sleep)
+
+```
+
+We can easily verify the results for the test statistic and p-value using the some of the formulas above and other R results.
+
+-    $\sqrt{MSE} = S = \text{Residual standard error} = \text{sigma}$
+
+```{r}
+
+# save model summary
+summ <- summary(mod_sleep)
+
+# calculate needed values
+beta1_hat <- coef(mod_sleep)[2] %>% as.numeric
+mse <- summ$sigma^2
+s_xx <- sum((mod_sleep$model$sleep_cycle - mean(mod_sleep$model$sleep_cycle))^2)
+se <- sqrt(mse / s_xx)
+
+# calculate test statistic and p-value
+(t <- beta1_hat / se)
+(p_value <- 2 * pt(t, df = df.residual(mod_sleep)))
+
+```
+
+The summary also gives us the coeffecient of determination $R^2$, which we would like to maximize.
+
+```{r}
+
+# model summary
+# -> looking for 'Multiple R-squared'
+summary(mod_sleep)
+
+```
+
+## Diagnostics
+
+To see if our model is appropriate, we need to perform **residual analysis** and look for the specific patterns of interest in LINE (Linearity, Independence, Normality, Equal variance).
+
+This is really easy to do in R: simply run `plot(< mod >)`.
+
+```{r}
+
+# create residual plots
+plot(mod_sleep, which = 1:2)
+
+# plot distribution plots of residuals
+boxplot(residuals(mod_sleep), horizontal=TRUE)
+hist(residuals(mod_sleep))
+
+```
+
+From these plots, it seems that the only issue is with non-constant variance. One potential remedy for this is to transform the response variable and refit the model.
+
+## YOUR TURN
+
+Use the the `mpg` dataset to obtain a regression for predicting highway mpg `hwy` from city mpg `cty`. Then assess its adequacy.
+
+```{r}
+
+# preview data
+glimpse(mpg)
+
+# create scatterplot
+plot(x=mpg$cty, y=mpg$hwy)
+
+
+# fit regression model
+mod_mpg<-lm(hwy~cty, data=mpg)
+
+
+# view estimated coefficients
+coef(mod_mpg)
+
+# perform residual analysis
+plot(mod_mpg, which = 1:2)
+
+```
+
+From the residual plots, there does not appear to be any issues with the assumptions.
+
+## Multiple linear regression (MLR)
+
+It is very easy to extend SLR to multiple predictor variables. This allows us to improve our models by taking into account more predictors.
+
+Some other issues arise when we do this, such as which predictor variables to include and the relationship between the predictors. We will focus on the former and learn some easily implemented algorithms for variable selection.
+
+To see how to do this in R, lets perform some more EDA on the `mpg` dataset, specifically for the numeric predictors.
+
+```{r}
+
+# select numeric variables
+mpg_numeric <- mpg %>% 
+  select(where(is.numeric)) 
+
+# create scatterplot matrix
+pairs(mpg_numeric)
+
+# create correlation matrix
+(r <- mpg_numeric %>% 
+  as.matrix %>% 
+  cor %>% 
+  round(3))
+
+# visualize correlation matrix
+corrplot::corrplot(r)
+
+```
+
+From this it looks like we would want to include the following predictors as well: `disp`, and `cyl`. Now lets see which categorical predictors are relevant for predicting highway mpg.
+
+```{r}
+
+# EDA for categorical predictors
+
+# see number of categories for each variable
+mpg %>% 
+  select(where(is.character)) %>% 
+  map(\(col) length(unique(col)))
+
+# -> comparative boxplots
+ggplot(data = mpg,
+       aes(x = hwy,
+           y = class)) + 
+  geom_boxplot()
+
+```
+
+It appears all of the categorical variables have a relationship on highway mpg. For now, lets just pick a few with a small number of categories (we will see why): `drv` and `class`.
+
+Now lets fit a MLR model using the results of our EDA.
+
+```{r}
+
+# fit MLR model
+mod_mpg_mlr <- lm(hwy~cty+cyl+drv+class, data=mpg)
+
+# view model summary
+summary(mod_mpg_mlr)
+
+```
+
+Notice the following:
+
+-    Reduction in MSE: SLR = `r round(summary(mod_mpg)$sigma^2, 2)` and MLR = `r round(summary(mod_mpg_mlr)$sigma^2, 2)`
+
+-    Increase in $R^2$: SLR = `r round(summary(mod_mpg)$r.squared, 3)` and MLR = `r round(summary(mod_mpg_mlr)$r.squared, 3)`
+
+     - Recall that $R^2$ always increases when additional predictors are included, so it is better to look at the adjusted-$R^2$, which takes into account the inclusion of more variables.
+
+     - Increase in $R^2_{adj}$: SLR = `r round(summary(mod_mpg)$adj.r.squared, 3)` and MLR = `r round(summary(mod_mpg_mlr)$adj.r.squared, 3)`
+
+- Increase in the number of coefficients: SLR = `r length(coef(mod_mpg))` and MLR = `r length(coef(mod_mpg_mlr))`
+
+    - Even though the MLR model only had 4 predictor variables, there is many more coefficients because each categorical variable gets $k - 1$ coefficients per $k$ levels.
+
+Now lets assess the adequacy of our new model.
+
+```{r}
+
+# perform residual analysis
+plot(mod_mpg_mlr, which = 1:2)
+
+```
+
+There does not appear to be any issues with the assumptions.
+
+## Variable selection
+
+If we take a look at the previous MLR model summary, the majority of the predictors are significant, but some are not.
+
+```{r}
+
+# check significance of terms in model summary 
+summary(mod_mpg_mlr)
+
+```
+
+We could probably remove `cyl` to get a more **parsimonious model**, which means fewer predictors. In general, we want the best, smallest model that is possible.
+
+Lets remove it and see the result:
+
+```{r}
+
+# fit new MLR model
+mod_mpg_mlr2 <- lm(hwy ~ cty+drv+class, data=mpg)
+
+# view model summary
+
+
+```
+
+Removing this had virtually no effect on the quality of the fit, so it was a good decision.
+
+Recall however, we eliminated some predictor variables from the start after our EDA, which was kind of subjective. Now we will learn an algorithm to make the decisions for us in a prescribed manner.
+
+**Stepwise variable selection** is a search method that develops a sequence of regression models, at each step adding or deleting an $X$ variable (iterative procedure). Several criterion can be used to make the decision to include or delete a variable; we will use p-values.
+
+Forward stepwise regression
+
+-    Step 0: Start with intercept-only model.
+
+-    Step 1: Fit all one variable models and evaluate criteria. Find the best. For example, the largest or equivalently smallest p-value.
+
+-    Step 2: Start with the variable from the previous step and fit all 2 variable models. Find the best second variable and see if it meets the keep criteria.
+
+-    Step 3: Check to see if a variable should be deleted. Fit model with all predictors currently kept and see if one variable should be dropped (i.e. see if criteria is on wrong side of the keep criteria).
+
+-   Step 4: Continue adding and checking to see if previous variable should be dropped until adding a variable doesn’t improve the model and dropping a variable doesn’t improve the model. Then algorithm is done.
+
+-   Note that the stepwise regression algorithm allows any variable, brought into the model at an earlier stage, to be dropped subsequently if it is no longer helpful in conjunction with variables added at later stages.
+
+Here is how to do it in R (using the `olsrr` package). For illustration purposes, we will only use the numeric predictors, although this process also works with categorical predictors.+
+
+```{r}
+
+# specify full model
+mod_full <- lm(hwy ~ . , data=mpg_numeric)
+
+# perform forward stepwise regression based on p-values
+mod_step <- olsrr::ols_step_both_p(mod_full, details=TRUE)
+
+# show model summary
+summary(mod_step$model)
+
+```
+
+Now we can add the categorical predictors to the algorithm and see the results.
+
+```{r}
+
+# respecify full model to include categorical predictors
+mod_full2 <- lm(hwy~ . -model, data=mpg)
+
+# perform forward stepwise regression based on p-values
+mod_step2 <- olsrr::ols_step_both_p(mod_full2)
+
+# show model summary
+summary(mod_step2$model)
+
+# check diagnostics one last time
+plot(mod_step2$model, which=1:2)
+
+```
+
+## Model validation
+
+The final step in the model-building process is the validation of the selected regression models. Model validation usually involves checking a candidate model against independent data. Three basic ways of validating a regression model are:
+
+1. Collection of new data to check the model and its predictive ability.
+
+2. Comparison of results with theoretical expectations, earlier empirical results, and simulation results.
+
+3. Use of a holdout sample to check the model and its predictive ability.
+
+If our model is generalizable (meaning applicable to new data), then we should see relatively small prediction errors.
+
+Collecting more data in practice is often costly, so we will use a holdout sample, which means a portion of the data is held out from the original model training and reserved for testing (a common ratio for training / testing split is 75/25).
+
+Once candidate models are trained on the say 75% of the data, we apply that model to the 25% and calculate some measure of predictive accuracy. A common measure is **root mean square prediction error RMSE**:
+
+$$\text{RMSE} = \bigg[\frac{1}{n_{\text{test}}} \sum^{n_{\text{test}}}_{i = 1} (y_{\text{new, }i} - \hat{y}_{\text{new, }i})^2\bigg]^{1/2}$$
+
+This value can be compared to the estimated $\sqrt{MSE} = S$ from the models for the training data to get an idea of its magnitude.
+
+To practice this, now lets split our `mpg` data and fit the candidate models from earlier on the training data, then apply each of them with the testing data.
+
+```{r}
+
+# set seed on a split that works
+set.seed(1)
+
+# make train / test split
+# -> note using a higher proportion in the training data to ensure appearance of all unique levels of the categorical variables
+nrow(mpg)
+split_mpg <- rsample::initial_split(data = mpg, prop = .90)
+
+# save train data
+data_train <- split_mpg %>% rsample::training() 
+nrow(data_train)
+
+# save test data
+data_test <- split_mpg %>% rsample::testing() 
+nrow(data_test)
+
+```
+
+Now we can refit the models.
+
+```{r}
+
+# refit several candidate models on the training data
+
+# -> SLR model
+mod_mpg_slr <- lm(formula(mod_mpg), data = data_train)
+
+# -> stepwise MLR with only numeric predictors
+mod_mpg_mlr_num <- lm(formula(mod_step$model), data = data_train)
+
+# -> stepwise MLR now including categorical predictors
+mod_mpg_mlr_cat <- lm(formula(mod_step2$model), data = data_train)
+
+```
+
+Now we can make predictions and calculate the RMSEs.
+
+```{r}
+
+# easily make predictions
+preds_slr <- predict(mod_mpg_slr, newdata=data_test)
+
+# calculate RMSE manually
+mean((data_test$hwy - preds_slr)^2) %>% sqrt
+
+# compare to S of the fitted model# compsqrt()are to S of the fitted model
+summary(mod_mpg_slr)$sigma
+
+# get an idea of the predictions compared to the original values
+data_test_slr <- broom::augment(mod_mpg_slr, newdata=data_test)
+
+# recalculate RMSE to verify it
+mean(data_test_slr$.resid^2) %>% sqrt
+
+```
+
+This is a very common modelling task, so there are functions to calculate RMSE for us once we make the predictions. Lets try this, then use it to find the RMSE for the other candidate models.
+
+```{r}
+
+# recalculate RMSE again
+yardstick::rmse_vec(truth= data_test$hwy, estimate=preds_slr)
+
+# calculate RMSE for the other two candidate models
+
+# -> stepwise MLR with only numeric predictors
+yardstick::rmse_vec(truth= data_test$hwy, estimate= predict(mod_mpg_mlr_num, newdata=data_test))
+
+# -> stepwise MLR now including categorical predictors
+yardstick::rmse_vec(truth= data_test$hwy, estimate= predict(mod_mpg_mlr_cat, newdata=data_test))
+
+```
+
+<!-- It appears that the stepwise regression model was the best with an $RMSE$ = `r round(yardstick::rmse_vec(truth = data_test$hwy, estimate = predict(mod_mpg_mlr_cat, newdata = data_test)), 3)`, compared to the original $S$ = `r round(summary(mod_mpg_mlr_cat)$sigma, 3)`. -->
+
