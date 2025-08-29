@@ -1,0 +1,25 @@
+# Count R as the main language
+*.R linguist-detectable=true
+*.r linguist-detectable=true
+*.Rmd linguist-language=R
+
+# If you keep notebooks with R kernels, count them as R
+*.ipynb linguist-language=R
+
+# Ignore auto-generated or bulky files
+data/** linguist-detectable=false
+datasets/** linguist-detectable=false
+
+*.csv linguist-detectable=false
+*.tsv linguist-detectable=false
+*.xlsx linguist-detectable=false
+*.xls linguist-detectable=false
+*.parquet linguist-detectable=false
+*.feather linguist-detectable=false
+
+# Figures/plots shouldn’t skew language stats
+*.png linguist-detectable=false
+*.jpg linguist-detectable=false
+*.jpeg linguist-detectable=false
+*.svg linguist-detectable=false
+*.pdf linguist-detectable=false
