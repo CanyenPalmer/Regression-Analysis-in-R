@@ -1,15 +1,17 @@
-# Count R as the main language
-*.R linguist-detectable=true
-*.r linguist-detectable=true
+# Treat Quarto and R Markdown as R
+*.qmd linguist-language=R
 *.Rmd linguist-language=R
 
-# If you keep notebooks with R kernels, count them as R
+# Standard R scripts
+*.R linguist-detectable=true
+*.r linguist-detectable=true
+
+# Count R notebooks as R (if you use them)
 *.ipynb linguist-language=R
 
-# Ignore auto-generated or bulky files
+# Exclude data & outputs from skewing stats
 data/** linguist-detectable=false
 datasets/** linguist-detectable=false
-
 *.csv linguist-detectable=false
 *.tsv linguist-detectable=false
 *.xlsx linguist-detectable=false
@@ -17,7 +19,7 @@ datasets/** linguist-detectable=false
 *.parquet linguist-detectable=false
 *.feather linguist-detectable=false
 
-# Figures/plots shouldn’t skew language stats
+# Ignore figures
 *.png linguist-detectable=false
 *.jpg linguist-detectable=false
 *.jpeg linguist-detectable=false
